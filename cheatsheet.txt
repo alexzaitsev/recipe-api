@@ -1,0 +1,3 @@
+superuser for local test db:
+    - email: admin@google.com
+    - password: admin
