@@ -10,12 +10,22 @@ from recipe.serializers import TagSerializer
 TAGS_URL = reverse('recipe:tag-list')
 
 
+def make_detail_url(**kwargs):
+    return reverse('recipe:tag-detail', kwargs=kwargs)
+
+
 class PublicTagsApiTests(APITestCase):
     """Test the publicly available tags API"""
 
-    def test_login_required(self):
-        """Test that login is required for retrieving tags"""
+    def test_login_required_for_list(self):
+        """Test that login is required to access the endpoint"""
         response = self.client.get(TAGS_URL)
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_login_required_for_details(self):
+        """Test that login is required to access the endpoint"""
+        response = self.client.get(make_detail_url(pk=1))
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
@@ -79,3 +89,22 @@ class PrivateTagsApiTest(APITestCase):
         response = self.client.post(TAGS_URL, payload)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_retrieve_tag(self):
+        """Test retrieving a single tag"""
+        tag = Tag.objects.create(user=self.user, name='Raw')
+        response = self.client.get(make_detail_url(pk=tag.pk))
+
+        self.assertEqual(response.data, TagSerializer(tag).data)
+
+    def test_retrieve_others_tag_returns_not_found(self):
+        """Test that effort to retrieve another user's tag returns Not found"""
+        # create Tag for a new user
+        user2 = get_user_model().objects.create_user(
+            'other@test.com',
+            'testpass'
+        )
+        tag = Tag.objects.create(user=user2, name='Fruity')
+
+        response = self.client.get(make_detail_url(pk=tag.pk))
+        self.assertEqual(response.data['detail'], 'Not found.')

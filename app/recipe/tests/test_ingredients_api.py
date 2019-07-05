@@ -6,15 +6,26 @@ from rest_framework.test import APITestCase
 from core.models import Ingredient
 from recipe.serializers import IngredientSerializer
 
+
 INGREDIENTS_URL = reverse('recipe:ingredient-list')
+
+
+def make_detail_url(**kwargs):
+    return reverse('recipe:ingredient-detail', kwargs=kwargs)
 
 
 class PublicIngredientsApiTest(APITestCase):
     """Test the publicly available ingredients API"""
 
-    def test_login_required(self):
+    def test_login_required_for_list(self):
         """Test that login is required to access the endpoint"""
         response = self.client.get(INGREDIENTS_URL)
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_login_required_for_details(self):
+        """Test that login is required to access the endpoint"""
+        response = self.client.get(make_detail_url(pk=1))
 
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
@@ -62,3 +73,41 @@ class PrivateIngredientApiTest(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data, serializer.data)
+
+    def test_create_ingredients_successful(self):
+        """Test creating a new ingredient"""
+        payload = {'name': 'Cabbage'}
+        self.client.post(INGREDIENTS_URL, payload)
+
+        exists = Ingredient.objects.filter(user=self.user,
+                                           name=payload['name'])
+        self.assertTrue(exists)
+
+    def test_create_ingredient_invalid_name(self):
+        """Test creating invalid ingredient fails"""
+        payload = {'name': ''}
+        response = self.client.post(INGREDIENTS_URL, payload)
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_retrieve_ingredient(self):
+        """Test retrieving a single ingredient"""
+        ingr = Ingredient.objects.create(user=self.user, name='Apricot')
+        response = self.client.get(make_detail_url(pk=ingr.pk))
+
+        self.assertEqual(response.data, IngredientSerializer(ingr).data)
+
+    def test_retrieve_others_ingredient_returns_not_found(self):
+        """
+        Test that effort to retrieve another user's ingredient
+        returns Not found
+        """
+        # create Ingredient for a new user
+        user2 = get_user_model().objects.create_user(
+            'other@test.com',
+            'testpass'
+        )
+        ingr = Ingredient.objects.create(user=user2, name='Vinegar')
+
+        response = self.client.get(make_detail_url(pk=ingr.pk))
+        self.assertEqual(response.data['detail'], 'Not found.')
