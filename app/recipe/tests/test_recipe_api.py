@@ -4,6 +4,7 @@ import tempfile
 from PIL import Image
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from django.utils.translation import gettext as _
 
 from core.models import Recipe, Tag, Ingredient
 from rest_framework import status
@@ -198,6 +199,78 @@ class PrivateRecipeApiTests(APITestCase):
             self.assertEqual(payload[key], getattr(recipe, key))
         # check that recipe contains no tags
         self.assertEqual(recipe.tags.all().count(), 0)
+
+    def test_filter_recipes_by_tags(self):
+        """Test returning recipes with specific tags"""
+        recipe1 = sample_recipe(user=self.user, title='Thai vegetable curry')
+        recipe2 = sample_recipe(user=self.user, title='Aubergine with tahini')
+        tag1 = sample_tag(user=self.user, name='Vegan')
+        tag2 = sample_tag(user=self.user, name='Vegeterian')
+        tag3 = sample_tag(user=self.user, name='Easy')
+        recipe1.tags.add(tag1)
+        recipe2.tags.add(tag2)
+        recipe2.tags.add(tag3)
+        recipe3 = sample_recipe(user=self.user, title='Fish and chips')
+
+        response = self.client.get(
+            RECIPES_URL,
+            {'tags': f'{tag1.id},{tag2.id},{tag3.id}'}
+        )
+
+        serializer1 = RecipeSerializer(recipe1)
+        serializer2 = RecipeSerializer(recipe2)
+        serializer3 = RecipeSerializer(recipe3)
+        self.assertEqual(len(response.data), 2)
+        self.assertIn(serializer1.data, response.data)
+        self.assertIn(serializer2.data, response.data)
+        self.assertNotIn(serializer3.data, response.data)
+
+    def test_filter_recipes_by_ingredients(self):
+        """Test returning recipes with specific ingredients"""
+        recipe1 = sample_recipe(user=self.user, title='Posh beans on toast')
+        recipe2 = sample_recipe(user=self.user, title='Chicken cacciatore')
+        ingr1 = sample_ingredient(user=self.user, name='Feta cheese')
+        ingr2 = sample_ingredient(user=self.user, name='Chicken')
+        ingr3 = sample_ingredient(user=self.user, name='Oil')
+        recipe1.ingredients.add(ingr1)
+        recipe2.ingredients.add(ingr2)
+        recipe2.ingredients.add(ingr3)
+        recipe3 = sample_recipe(user=self.user, title='Steak and mushrooms')
+
+        response = self.client.get(
+            RECIPES_URL,
+            {'ingredients': f'{ingr1.id},{ingr2.id},{ingr3.id}'}
+        )
+
+        serializer1 = RecipeSerializer(recipe1)
+        serializer2 = RecipeSerializer(recipe2)
+        serializer3 = RecipeSerializer(recipe3)
+        self.assertEqual(len(response.data), 2)
+        self.assertIn(serializer1.data, response.data)
+        self.assertIn(serializer2.data, response.data)
+        self.assertNotIn(serializer3.data, response.data)
+
+    def test_wrong_tags_filter(self):
+        """Test that wrong filter returns error message"""
+        response = self.client.get(
+            RECIPES_URL,
+            {'tags': 'wrong'}
+        )
+
+        self.assertEqual(response.data['detail'],
+                         _('tags must be a comma separated '
+                           'list of integers'))
+
+    def test_wrong_ingredients_filter(self):
+        """Test that wrong filter returns error message"""
+        response = self.client.get(
+            RECIPES_URL,
+            {'ingredients': 'wrong'}
+        )
+
+        self.assertEqual(response.data['detail'],
+                         _('ingredients must be a comma '
+                           'separated list of integers'))
 
 
 class RecipeImageUploadTests(APITestCase):

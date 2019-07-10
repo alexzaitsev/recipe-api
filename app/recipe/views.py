@@ -4,8 +4,10 @@ from recipe.serializers import TagSerializer, IngredientSerializer, \
 from rest_framework import viewsets, mixins, status
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.decorators import action
+from rest_framework.exceptions import ParseError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from django.utils.translation import gettext as _
 
 
 class BaseRecipeAttrViewSet(viewsets.GenericViewSet,
@@ -50,7 +52,26 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """Return objects for the current authenticated user only"""
-        return self.queryset.filter(user=self.request.user)
+        tags = self.request.query_params.get('tags')
+        ingredients = self.request.query_params.get('ingredients')
+        queryset = self.queryset
+        if tags:
+            try:
+                tag_ids = list(map(int, tags.split(',')))
+                queryset = queryset.filter(tags__id__in=tag_ids).distinct()
+            except ValueError:
+                raise ParseError(_('tags must be a comma separated '
+                                   'list of integers'))
+        if ingredients:
+            try:
+                ingr_ids = list(map(int, ingredients.split(',')))
+                queryset = queryset.filter(ingredients__id__in=ingr_ids)\
+                    .distinct()
+            except ValueError:
+                raise ParseError(_('ingredients must be a comma '
+                                   'separated list of integers'))
+
+        return queryset.filter(user=self.request.user)
 
     def get_serializer_class(self):
         """Return appropriate serializer class"""
