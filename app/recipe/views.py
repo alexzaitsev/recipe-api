@@ -21,7 +21,18 @@ class BaseRecipeAttrViewSet(viewsets.GenericViewSet,
 
     def get_queryset(self):
         """Return objects for the current authenticated user only"""
-        return self.queryset.filter(user=self.request.user).order_by('name')
+        try:
+            assigned_only = bool(
+                int(self.request.query_params.get('assigned_only', 0))
+            )
+            queryset = self.queryset
+            if assigned_only:
+                queryset = queryset.filter(recipe__isnull=False)
+        except ValueError:
+            raise ParseError(_('assigned_only must be an integer'))
+
+        return queryset.filter(user=self.request.user)\
+            .order_by('name').distinct()
 
     def perform_create(self, serializer):
         """Create a new object"""
@@ -58,20 +69,20 @@ class RecipeViewSet(viewsets.ModelViewSet):
         if tags:
             try:
                 tag_ids = list(map(int, tags.split(',')))
-                queryset = queryset.filter(tags__id__in=tag_ids).distinct()
+                queryset = queryset.filter(tags__id__in=tag_ids)
             except ValueError:
                 raise ParseError(_('tags must be a comma separated '
                                    'list of integers'))
         if ingredients:
             try:
                 ingr_ids = list(map(int, ingredients.split(',')))
-                queryset = queryset.filter(ingredients__id__in=ingr_ids)\
-                    .distinct()
+                queryset = queryset.filter(ingredients__id__in=ingr_ids)
             except ValueError:
                 raise ParseError(_('ingredients must be a comma '
                                    'separated list of integers'))
 
-        return queryset.filter(user=self.request.user)
+        return queryset.filter(user=self.request.user)\
+            .order_by('-id').distinct()
 
     def get_serializer_class(self):
         """Return appropriate serializer class"""

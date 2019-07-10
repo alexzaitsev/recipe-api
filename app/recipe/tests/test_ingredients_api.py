@@ -1,9 +1,10 @@
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from django.utils.translation import gettext as _
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from core.models import Ingredient
+from core.models import Ingredient, Recipe
 from recipe.serializers import IngredientSerializer
 
 
@@ -111,3 +112,49 @@ class PrivateIngredientApiTest(APITestCase):
 
         response = self.client.get(make_detail_url(pk=ingr.pk))
         self.assertEqual(response.data['detail'], 'Not found.')
+
+    def test_retrieve_ingredients_assigned_to_recipes(self):
+        """Test filtering ingredients by those assigned to recipes"""
+        ingr1 = Ingredient.objects.create(user=self.user, name='Apples')
+        ingr2 = Ingredient.objects.create(user=self.user, name='Turkey')
+        recipe = Recipe.objects.create(
+            title='Apple crumble',
+            time_mins=5,
+            user=self.user
+        )
+        recipe.ingredients.add(ingr1)
+
+        response = self.client.get(INGREDIENTS_URL, {'assigned_only': 1})
+        serializer1 = IngredientSerializer(ingr1)
+        serializer2 = IngredientSerializer(ingr2)
+        self.assertEqual(len(response.data), 1)
+        self.assertIn(serializer1.data, response.data)
+        self.assertNotIn(serializer2.data, response.data)
+
+    def test_retrieve_ingredients_assigned_unique(self):
+        """Test filtering ingredients by assigned returns unique items"""
+        ingr = Ingredient.objects.create(user=self.user, name='Eggs')
+        Ingredient.objects.create(user=self.user, name='Cheese')
+        recipe1 = Recipe.objects.create(
+            title='Eggs benedict',
+            time_mins=30,
+            user=self.user
+        )
+        recipe1.ingredients.add(ingr)
+        recipe2 = Recipe.objects.create(
+            title='Coriander eggs on toast',
+            time_mins=20,
+            user=self.user
+        )
+        recipe2.ingredients.add(ingr)
+
+        response = self.client.get(INGREDIENTS_URL, {'assigned_only': 1})
+        self.assertEqual(len(response.data), 1)
+
+    def test_wrong_assign_only_filter_ingredients(self):
+        """Test that wrong filter returns error"""
+        response = self.client.get(INGREDIENTS_URL,
+                                   {'assigned_only': 'wrong'})
+
+        self.assertEqual(response.data['detail'],
+                         _('assigned_only must be an integer'))
