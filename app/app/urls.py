@@ -23,7 +23,7 @@ from app import settings
 
 
 urlpatterns = [
-    url('docs/', get_swagger_view(title='Recipe API')),
+    url('swagger/', get_swagger_view(title='Recipe API')),
     path('admin/', admin.site.urls),
     path('api/user/', include('user.urls')),
     path('api/recipe/', include('recipe.urls')),
