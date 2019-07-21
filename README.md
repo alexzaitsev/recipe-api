@@ -29,9 +29,3 @@ instead of `username` and `password`. That is mirrored in admin panel as well.
 
 Tags, ingredients, and recipes can be filtered using GET query params.
 
-# Upwork
-
-This project is part of my Upwork portfolio.
-Please check my [Upwork profile](https://www.upwork.com/o/profiles/users/_~010104bbdffc992d66/?s=1110580748673863680) in order to reach to other projects.
-
-Btw, I'm available for freelance work! 
